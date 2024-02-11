@@ -44,7 +44,7 @@ def start_compress(args: Namespace):
 
 
 def main():
-    parser = ArgumentParser(description='My program')
+    parser = ArgumentParser(description='Blockset Compressor/Decompressor')
 
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('-d', '--decompress', action='store_true',
