@@ -3,12 +3,9 @@ from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from csv import reader, writer
 
-
 from tools.codecs.tilemap2d import Tilemap2D
 from tools.models.tile import Tile
 
-#tm.decompress(Path(r"C:\projects\landstalker_disasm\disassembly\assets_packed\graphics\static\titlescreen\title1.rle").read_bytes())
-#tm.decompress(Path(r"tilemap.rle").read_bytes())
 
 def start_decompress(args: Namespace):
 
@@ -64,8 +61,7 @@ def main():
                         help='Length in hex (requires decompression mode and start address)')
     parser.add_argument('-o', '--output', type=str, default=None,
                         help='Output filename (optional, should default to .csv in decompression mode, or .rle in compression mode)')
-    parser.add_argument('infile', type=str, nargs=1,
-                        help='Input filename')
+    parser.add_argument('infile', type=str, nargs=1, help='Input filename')
 
     # Parse the arguments
     args = parser.parse_args()
