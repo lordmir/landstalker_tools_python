@@ -17,8 +17,8 @@ class TileCommand(IntEnum):
     """
     DECODE_LONG_TILE = 0,
     DECODE_SHORT_TILE = 1,
-    INCREMENT_LONG_TILE = 2
-    INCREMENT_SHORT_TILE = 3,
+    INCREMENT_LONG_TILE = 2,
+    INCREMENT_SHORT_TILE = 3
 
 class Tilemap3D:
     """
@@ -34,8 +34,9 @@ class Tilemap3D:
         hm_width: Width of the heightmap.
         hm_height: Height of the heightmap.
     """
-    def __init__(self, data: bytes | None = None) -> None:
+    def __init__(self, data: bytes | None = None, **kwargs) -> None:
         """Class Constructor"""
+        self.verbose = kwargs.get("verbose", False)
         if data:
             self.decode(data)
         else:
@@ -115,6 +116,8 @@ class Tilemap3D:
         
         if len(offsets) < 14:
             offsets.extend([0] * (14 - len(offsets)))
+
+        self._vprint(f"Offsets: " + " ".join([f"[{i}:{o:03X}]" for i, o in enumerate(offsets)]))
         
         return offsets
     
@@ -224,8 +227,8 @@ class Tilemap3D:
         short_tile_key = self._calculate_short_tile_key(incrementing_tile_counts)
         long_tile_key = self._calculate_long_tile_key(incrementing_tile_counts, ranged_tile_counts)
 
-        # print("TILE DICT 0:", hex(long_tile_key))
-        # print("TILE DICT 1:", hex(short_tile_key))
+        self._vprint("TILE DICT 0:", hex(long_tile_key))
+        self._vprint("TILE DICT 1:", hex(short_tile_key))
 
         return {"long": long_tile_key, "short": short_tile_key}
 
@@ -299,32 +302,28 @@ class Tilemap3D:
         
         return incrementing_tile_counts, ranged_tile_counts
     
-    @staticmethod
-    def _handle_encode_increment_short_tile(tile: int, tile_dict: dict[str, int],
-                                            tile_increment: dict[str, int]) -> dict[str, int]:
-        # print("INCREMENT TILE 0 [", hex(tile), " @", i, "]")
+    def _handle_encode_increment_short_tile(self, tile: int, tile_dict: dict[str, int],
+                                           tile_increment: dict[str, int], position: int) -> dict[str, int]:
+        self._vprint(f"INCREMENT SHORT TILE {tile:04X} @ {position}")
         tile_increment["short"] += 1
         return {"mode": TileCommand.INCREMENT_SHORT_TILE, "val": 0, "len": 0}
 
-    @staticmethod
-    def _handle_encode_increment_long_tile(tile: int, tile_dict: dict[str, int],
-                                           tile_increment: dict[str, int]) -> dict[str, int]:
-        # print("INCREMENT TILE 1 [", hex(tile), " @", i, "]")
+    def _handle_encode_increment_long_tile(self, tile: int, tile_dict: dict[str, int],
+                                           tile_increment: dict[str, int], position: int) -> dict[str, int]:
+        self._vprint(f"INCREMENT LONG TILE  {tile:04X} @ {position}")
         tile_increment["long"] += 1
         return {"mode": TileCommand.INCREMENT_LONG_TILE, "val": 0, "len": 0}
 
-    @staticmethod
-    def _handle_encode_short_tile(tile: int, tile_dict: dict[str, int],
-                                  tile_increment: dict[str, int]) -> dict[str, int]:
-        # print("PLACE REL TILE [", hex(tile), " @", i, "]")
+    def _handle_encode_short_tile(self, tile: int, tile_dict: dict[str, int],
+                                  tile_increment: dict[str, int], position) -> dict[str, int]:
+        self._vprint(f"PLACE SHORT TILE     {tile:04X} @ {position}")
         return {"mode": TileCommand.DECODE_SHORT_TILE,
                 "val": tile - tile_dict["short"],
                 "len": tile_increment["short"].bit_length()}
 
-    @staticmethod
-    def _handle_encode_long_tile(tile: int, tile_dict: dict[str, int],
-                                 tile_increment: dict[str, int]) -> dict[str, int]:
-        # print("PLACE TILE", hex(tile), "@", i)
+    def _handle_encode_long_tile(self, tile: int, tile_dict: dict[str, int],
+                                 _, position: int) -> dict[str, int]:
+        self._vprint(f"PLACE LONG TILE      {tile:04X} @ {position}")
         return {"mode": TileCommand.DECODE_LONG_TILE,
                 "val": tile,
                 "len": tile_dict["long"].bit_length()}
@@ -364,7 +363,7 @@ class Tilemap3D:
                     mode = TileCommand.DECODE_SHORT_TILE
                 else:
                     mode = TileCommand.DECODE_LONG_TILE
-                tile_entries.append(ENCODE_HANDLERS[mode](tile, tile_dict, tile_increment))
+                tile_entries.append(ENCODE_HANDLERS[mode](tile, tile_dict, tile_increment, i))
         return tile_entries
 
     def _encode_heightmap(self) -> list[tuple[int, int]]:
@@ -673,6 +672,9 @@ class Tilemap3D:
 
         for i in range(6, 14):
             offset_dictionary[i] = bitstream.read("uint:12")
+        
+        self._vprint(f"Tile Dictionary: {tile_dictionary[0]:04X} {tile_dictionary[1]:04X}")
+        self._vprint(f"Offsets: " + " ".join([f"[{i}:{o:03X}]" for i, o in enumerate(offset_dictionary)]))
         return offset_dictionary, tile_dictionary
 
     def _decode_map_buffer_pass_one(self, bitstream: BitStream,
@@ -741,6 +743,7 @@ class Tilemap3D:
                 - ds.buffer_idx (int): The current buffer index  
         """
         offset = ds.buffer_idx - ds.buffer[ds.buffer_idx]
+        self._vprint(f"COPY ACROSS   IDX={ds.buffer_idx}  OFFSET={offset}")
 
         while True:
             ds.buffer[ds.buffer_idx] = ds.buffer[offset]
@@ -748,9 +751,8 @@ class Tilemap3D:
             offset += 1
             if ds.buffer_idx >= len(ds.buffer) or ds.buffer[ds.buffer_idx] != 0:
                 break
-
-    @staticmethod 
-    def _handle_decode_long_tile(ds: SimpleNamespace) -> int:
+ 
+    def _handle_decode_long_tile(self, ds: SimpleNamespace) -> int:
         """
         Handles the decoding of a long tile.
 
@@ -762,12 +764,13 @@ class Tilemap3D:
         if ds.tile_counters[0]:
             bit_width = ds.tile_counters[0].bit_length()
             value = ds.bitstream.read(f"uint:{bit_width}")
+            self._vprint(f"PLACE LONG TILE      {value:04X} @ {ds.buffer_idx} [L={bit_width}]")
         else:
             value = 0
+            self._vprint(f"PLACE LONG TILE      {value:04X} @ {ds.buffer_idx} [L=0]")
         return value
 
-    @staticmethod
-    def _handle_decode_short_tile(ds: SimpleNamespace) -> int:
+    def _handle_decode_short_tile(self, ds: SimpleNamespace) -> int:
         """
         Handles the decoding of a short tile.
 
@@ -783,11 +786,15 @@ class Tilemap3D:
             tile_diff = ds.tile_counters[1] - ds.tile_dictionary[1]
             bit_width = tile_diff.bit_length()
             value = ds.bitstream.read(f"uint:{bit_width}")
+            self._vprint(f"PLACE SHORT TILE     {value:04X} @ {ds.buffer_idx} [L={bit_width}, C={ds.tile_counters[1]:04X}, D={tile_diff}]")
+        else:
+            self._vprint(f"PLACE SHORT TILE     {value:04X} @ {ds.buffer_idx} [L=0, C={ds.tile_counters[1]:04X}]")
+
+        value += ds.tile_dictionary[1]
 
         return value + ds.tile_dictionary[1]
 
-    @staticmethod
-    def _handle_increment_long_tile(ds: SimpleNamespace) -> int:
+    def _handle_increment_long_tile(self, ds: SimpleNamespace) -> int:
         """
         Handles the incrementing of the long tile counter.
 
@@ -799,11 +806,11 @@ class Tilemap3D:
             int: The incremented long tile counter value.
         """
         value = ds.tile_counters[0]
+        self._vprint(f"INCREMENT LONG TILE  {value:04X} @ {ds.buffer_idx}")
         ds.tile_counters[0] += 1
         return value
 
-    @staticmethod
-    def _handle_increment_short_tile(ds: SimpleNamespace) -> int:
+    def _handle_increment_short_tile(self, ds: SimpleNamespace) -> int:
         """
         Handles the incrementing of the short tile counter.
 
@@ -815,6 +822,7 @@ class Tilemap3D:
             int: The incremented short tile counter value.
         """
         value = ds.tile_counters[1]
+        self._vprint(f"INCREMENT SHORT TILE {value:04X} @ {ds.buffer_idx}")
         ds.tile_counters[1] += 1
         return value
 
@@ -866,3 +874,7 @@ class Tilemap3D:
         self.height = 0
         self.hm_width = 0
         self.hm_height = 0
+    
+    def _vprint(self, *args, **kwargs) -> None:
+        if self.verbose:
+            print(*args, **kwargs)

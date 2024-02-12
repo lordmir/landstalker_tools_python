@@ -34,7 +34,7 @@ def start_decompress(args: Namespace):
         if args.length is not None:
             data = data[:args.length]
 
-    tm = Tilemap3D(data)
+    tm = Tilemap3D(data, verbose=bool(args.verbose))
 
     if args.output_dir is not None:
         outdir = Path(args.output_dir)
@@ -89,7 +89,7 @@ def start_compress(args: Namespace):
             else:
                 heightmap.append([int(x,0) for x in row])
     
-    tm = Tilemap3D()
+    tm = Tilemap3D(verbose=bool(args.verbose))
     tm.foreground, tm.width, tm.height = flatten(foreground)
     tm.background, *_ = flatten(background)
     tm.heightmap, tm.hm_width, tm.hm_height = flatten(heightmap)
@@ -104,6 +104,7 @@ def start_compress(args: Namespace):
 def build_argparser() -> ArgumentParser:
     # Create the main parser
     parser = ArgumentParser(description='Compress or decompress Isometric Maps')
+    parser.add_argument("-v", "--verbose", help="Enable Verbose Mode", action='store_true')
 
     # Create subparsers for each mode
     subparsers = parser.add_subparsers(title='Modes', help='Select a mode')
