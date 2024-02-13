@@ -5,6 +5,8 @@ import sys
 
 from scripts.common.codecs.lz77 import LZ77_encode, LZ77_decode
 
+BLANK_THRESHOLD = 5
+
 @dataclass
 class SubSprite:
     x: int
@@ -72,7 +74,6 @@ class SpriteFrame:
         SUBSPRITE_END_BIT = 0x80
 
         encoded_data = bytearray()
-        print(self.subsprites)
         for subsprite in self.subsprites:
             # Add 0x100 to coordinates if negative
             x = subsprite.x + 0x100 if subsprite.x < 0 else subsprite.x
@@ -96,13 +97,10 @@ class SpriteFrame:
         Returns:
             bytes: Encoded tile data
         """
-        tile_data = self.tile_data
         output = bytearray()
-        BLANK_THRESHOLD = 5
         last_cmd = 0
 
         def encode_word(word: int):
-            print(f"{word:04X}")
             output.extend(word.to_bytes(2, 'big'))
 
         def encode_compressed(data: bytes):
@@ -114,52 +112,52 @@ class SpriteFrame:
             return len(data)
 
         i = 0
-        blank_count = 0
-        while i < len(tile_data):
+        while i < len(self.tile_data):
             if self.is_compressed:
                 # Compress every byte
                 last_cmd = len(output)
-                encode_compressed(tile_data)
-                i += encode_compressed(tile_data)
+                encode_compressed(self.tile_data)
+                i += encode_compressed(self.tile_data)
             else:
-                # Check for runs:
-                blank_count = 0
-                run_length = 0
-                for j in range(i, len(tile_data), 2):
-                    word = int.from_bytes(tile_data[j:j+2], "big")
-                    run_length += 1
-                    if word == 0:
-                        blank_count += 1
-                        if run_length > blank_count and blank_count >= BLANK_THRESHOLD:
-                            run_length -= blank_count
-                            blank_count = 0
-                            break
-                    else:
-                        if blank_count >= BLANK_THRESHOLD:
-                            if run_length == blank_count + 1:
-                                run_length = 0
-                            break
-                        blank_count = 0
-                if blank_count >= BLANK_THRESHOLD:
+                count, is_blank = self._check_for_runs(i)
+                if is_blank:
                     # Encode blank run
                     control_word = TileCmds.BLANK_RUN_BIT
                     last_cmd = len(output)
-                    encode_word((control_word << 12) | blank_count)
-
-                    i += blank_count * 2
+                    encode_word((control_word << 12) | count)
                 else:
                     # Encode words directly
                     last_cmd = len(output)
-                    encode_word(run_length)
-                    for j in range(i, i + run_length*2, 2):
-                        output.append(tile_data[j])
-                        output.append(tile_data[j + 1])
-                    i += run_length * 2
+                    encode_word(count)
+                    for j in range(i, i + count*2, 2):
+                        output.append(self.tile_data[j])
+                        output.append(self.tile_data[j + 1])
+                i += count * 2
 
         # Set the stop bit
         output[last_cmd] |= TileCmds.STOP_BIT << 4
 
         return bytes(output)
+    
+    def _check_for_runs(self, index: int) -> tuple[int, bool]:
+        blank_count = 0
+        run_length = 0
+        for i in range(index, len(self.tile_data), 2):
+            word = int.from_bytes(self.tile_data[i:i+2], "big")
+            run_length += 1
+            if word == 0:
+                blank_count += 1
+                if run_length > blank_count and blank_count >= BLANK_THRESHOLD:
+                    run_length -= blank_count
+                    blank_count = 0
+                    break
+            else:
+                if blank_count >= BLANK_THRESHOLD:
+                    if run_length == blank_count + 1:
+                        run_length = 0
+                    break
+                blank_count = 0
+        return max(run_length, blank_count), blank_count > 0
 
     def _decode_subsprites(self, data: bytes) -> int:
         """Decodes subsprite definitions from sprite frame data.
