@@ -17,6 +17,6 @@ if __name__ == "__main__":
         print(f"Please specify a script to execute: [{', '.join([k for k in commands.keys()])}]")
         sys.exit(1)
     script_name = sys.argv[1]
-    args = sys.argv[1:]
+    args = sys.argv[2:]
     if script_name in commands:
         commands[script_name](args)
