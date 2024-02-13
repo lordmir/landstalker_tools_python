@@ -1,10 +1,11 @@
 import argparse
+import sys
 from pathlib import Path
 from csv import reader, writer
 
-from tools.strings.charset import CHARSETS, Charset
-from tools.strings.huffman_trees import HuffmanTrees
-from tools.strings.encode_decode import encode_string, decode_string, encode_credit_string, decode_credit_string, encode_intro_string, decode_intro_string
+from scripts.common.strings.charset import CHARSETS, Charset
+from scripts.common.strings.huffman_trees import HuffmanTrees
+from scripts.common.strings.encode_decode import encode_string, decode_string, encode_credit_string, decode_credit_string, encode_intro_string, decode_intro_string
 
 def begin_decompress(tree_offsets: bytes, tree_data: bytes, strings: bytes, charset: Charset) -> list[str]:
     """Decompress strings using Huffman trees and custom encoding."""
@@ -341,11 +342,11 @@ def build_argparser() -> argparse.ArgumentParser:
     return parser
 
 
-def main():
+def main(argv: list[str]):
     # Make the parser
     parser = build_argparser()
     # Parse the arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Run the command
     if "func" in args:
         args.func(args)
@@ -354,4 +355,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    main(sys.argv)

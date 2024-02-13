@@ -1,6 +1,6 @@
 from bitstring import BitStream
 
-from tools.strings.huffman_tree import HuffmanTree
+from scripts.common.strings.huffman_tree import HuffmanTree
 
 class HuffmanTrees:
     def __init__(self):

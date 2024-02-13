@@ -2,7 +2,7 @@ import struct
 from enum import IntEnum
 from types import SimpleNamespace
 
-from tools.models.tile import Tile
+from scripts.common.models.tile import Tile
 
 
 class Mode(IntEnum):

@@ -1,8 +1,9 @@
 from pathlib import Path
 from argparse import ArgumentParser, Namespace
 from json import dump, load
+import sys
 
-from tools.models.palette import Palettes
+from scripts.common.models.palette import Palettes
 
 def start_encode(args: Namespace) -> None:
     if args.output_file is None:
@@ -81,26 +82,16 @@ def build_argparser() -> ArgumentParser:
     return parser
 
 
-def main():
+def main(argv: list[str]):
     # Make the parser
     parser = build_argparser()
     # Parse the arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Run the command
     if "func" in args:
         args.func(args)
     else:
         parser.print_help()
 
-
 if __name__ == '__main__':
-    main()
-
-
-# data = bytearray()
-# for p in Path(r"C:\projects\landstalker_disasm\disassembly\assets_packed\graphics\roompalettes").glob("pal*.pal"):
-#     data.extend(p.read_bytes())
-
-# pal = Palettes(data=data, entries=13)
-# pal.print_palette_preview()
-# print(pal.encode() == data)
+    main(sys.argv)

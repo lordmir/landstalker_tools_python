@@ -1,50 +1,55 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from csv import reader, writer
+import sys
 
-from tools.codecs.blockset import compress, decompress
-from tools.models.tile import Tile
+from scripts.common.codecs.lz77 import LZ77_encode, LZ77_decode
 
-def start_decompress(args: Namespace):
+def start_decompress(args: Namespace) -> None:
+    """Starts decompression with command line args.
 
+    Args:
+        args: Command line arguments namespace.
+    """
     if args.output is None:
-        args.output = f'{Path(args.infile[0]).stem}.csv'
+        args.output = f'{Path(args.infile[0]).stem}.bin'
     
     with open(args.infile[0], 'rb') as f:
-        data = f.read()
+        compressed = f.read()
     
     if args.start is not None:
-        data = data[args.start:]
+        compressed = compressed[args.start:]
         if args.length is not None:
-            data = data[:args.length]
+            compressed = compressed[:args.length]
 
     
-    blocks = decompress(data)
-    with open(args.output, "w", newline="", encoding="utf-8") as f:
-        w = writer(f)
-        for block in blocks:
-            w.writerow([str(t.encode()) for t in block])
-    print(f"Decompressed {len(blocks)} blocks from {len(data)} bytes, {args.infile[0]} to {args.output}.")
-
-def start_compress(args: Namespace):
-
-    if args.output is None:
-            args.output = f'{Path(args.infile[0]).stem}.cbs'
-    
-    blocks = []
-    with open(args.infile[0], 'r', encoding="utf-8") as f:
-        csv = reader(f)
-        for row in csv:
-            blocks.extend([Tile(int(x, 16)) for x in row])
-
-    data = bytes(compress(blocks))
+    uncompressed, clen = LZ77_decode(compressed)
     with open(args.output, "wb") as f:
-        f.write(data)
-    print(f"Compressed {len(blocks)//4} blocks to {len(data)} bytes, {args.infile[0]} to {args.output}.")
+        f.write(uncompressed)
+
+    print(f"Decompressed {len(uncompressed)} bytes from {clen} bytes, {args.infile[0]} to {args.output}.")
+
+def start_compress(args: Namespace) -> None:
+    """Starts compression with command line args.
+
+    Args:  
+        args: Command line arguments namespace.
+    """
+    if args.output is None:
+        args.output = f'{Path(args.infile[0]).stem}.lz77'
+    
+    with open(args.infile[0], 'rb') as f:
+        uncompressed = f.read()
+
+    compressed = bytes(LZ77_encode(uncompressed))
+    with open(args.output, "wb") as f:
+        f.write(compressed)
+
+    print(f"Compressed {len(uncompressed)} bytes to {len(compressed)} bytes, {args.infile[0]} to {args.output}.")
 
 
-def main():
-    parser = ArgumentParser(description='Blockset Compressor/Decompressor')
+def main(argv: list[str]) -> None:
+    """Main entry point for the program."""
+    parser = ArgumentParser(description='LZ77 Graphics Compressor / Decompressor')
 
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('-d', '--decompress', action='store_true',
@@ -56,12 +61,12 @@ def main():
     parser.add_argument('-l', '--length', type=lambda x: int(x, base=0), default=None,
                         help='Length in hex (requires decompression mode and start address)')
     parser.add_argument('-o', '--output', type=str, default=None,
-                        help='Output filename (optional, should default to .csv in decompression mode, or .cbs in compression mode)')
+                        help='Output filename (optional, should default to .bin in decompression mode, or .lz77 in compression mode)')
     parser.add_argument('infile', type=str, nargs=1,
                         help='Input filename')
 
     # Parse the arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Check if start address and length are specified without decompression mode
     if (args.start or args.length) and not args.decompress:
@@ -86,4 +91,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)

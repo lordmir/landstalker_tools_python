@@ -1,54 +1,54 @@
+from pathlib import Path
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
+import sys
+from csv import reader, writer
 
-from tools.codecs.lz77 import LZ77_encode, LZ77_decode
+from scripts.common.codecs.tilemap2d import Tilemap2D
+from scripts.common.models.tile import Tile
 
-def start_decompress(args: Namespace) -> None:
-    """Starts decompression with command line args.
+def start_decompress(args: Namespace):
 
-    Args:
-        args: Command line arguments namespace.
-    """
     if args.output is None:
-        args.output = f'{Path(args.infile[0]).stem}.bin'
+        args.output = f'{Path(args.infile[0]).stem}.csv'
     
-    with open(args.infile[0], 'rb') as f:
-        compressed = f.read()
-    
+    data = Path(args.infile[0]).read_bytes()
+
     if args.start is not None:
-        compressed = compressed[args.start:]
+        data = data[args.start:]
         if args.length is not None:
-            compressed = compressed[:args.length]
+            data = data[:args.length]
 
-    
-    uncompressed, clen = LZ77_decode(compressed)
-    with open(args.output, "wb") as f:
-        f.write(uncompressed)
+    tm = Tilemap2D()
+    tm.decompress(data)
+    tilemap = tm.get_tiles()
 
-    print(f"Decompressed {len(uncompressed)} bytes from {clen} bytes, {args.infile[0]} to {args.output}.")
+    with open(args.output, "w", newline="", encoding="utf-8") as f:
+        w = writer(f)
+        for row in tilemap:
+            w.writerow([t.encode() for t in row])
+    print(f"Decompressed {tm.width}x{tm.height} tilemap from {len(data)} bytes, {args.infile[0]} to {args.output}.")
 
-def start_compress(args: Namespace) -> None:
-    """Starts compression with command line args.
+def start_compress(args: Namespace):
 
-    Args:  
-        args: Command line arguments namespace.
-    """
     if args.output is None:
-        args.output = f'{Path(args.infile[0]).stem}.lz77'
+            args.output = f'{Path(args.infile[0]).stem}.rle'
     
-    with open(args.infile[0], 'rb') as f:
-        uncompressed = f.read()
+    map = []
+    with open(args.infile[0], 'r', encoding="utf-8") as f:
+        csv = reader(f)
+        for row in csv:
+            map.append([Tile(int(x, 16)) for x in row])
+    
+    tm = Tilemap2D(map)
+    compressed = tm.compress()
+    Path(args.output).write_bytes(compressed)
 
-    compressed = bytes(LZ77_encode(uncompressed))
-    with open(args.output, "wb") as f:
-        f.write(compressed)
-
-    print(f"Compressed {len(uncompressed)} bytes to {len(compressed)} bytes, {args.infile[0]} to {args.output}.")
+    print(f"Compressed {tm.width}x{tm.height} tilemap to {len(compressed)} bytes, {args.infile[0]} to {args.output}.")
 
 
-def main() -> None:
-    """Main entry point for the program."""
-    parser = ArgumentParser(description='LZ77 Graphics Compressor / Decompressor')
+def main(argv: list[str]):
+    parser = ArgumentParser(description='2D Tilemap Compressor/Decompressor')
 
     mode_group = parser.add_mutually_exclusive_group(required=True)
     mode_group.add_argument('-d', '--decompress', action='store_true',
@@ -60,12 +60,11 @@ def main() -> None:
     parser.add_argument('-l', '--length', type=lambda x: int(x, base=0), default=None,
                         help='Length in hex (requires decompression mode and start address)')
     parser.add_argument('-o', '--output', type=str, default=None,
-                        help='Output filename (optional, should default to .bin in decompression mode, or .lz77 in compression mode)')
-    parser.add_argument('infile', type=str, nargs=1,
-                        help='Input filename')
+                        help='Output filename (optional, should default to .csv in decompression mode, or .rle in compression mode)')
+    parser.add_argument('infile', type=str, nargs=1, help='Input filename')
 
     # Parse the arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
 
     # Check if start address and length are specified without decompression mode
     if (args.start or args.length) and not args.decompress:
@@ -90,4 +89,4 @@ def main() -> None:
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)

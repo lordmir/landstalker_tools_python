@@ -1,8 +1,9 @@
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from csv import reader, writer
+import sys
 
-from tools.codecs.tilemap3d import Tilemap3D
+from scripts.common.codecs.tilemap3d import Tilemap3D
 
 def make_2d(data: list[int], width: int) -> list[list[int]]:
     result = []
@@ -136,11 +137,11 @@ def build_argparser() -> ArgumentParser:
     return parser
 
 
-def main():
+def main(argv: list[str]):
     # Make the parser
     parser = build_argparser()
     # Parse the arguments
-    args = parser.parse_args()
+    args = parser.parse_args(argv)
     # Run the command
     if "func" in args:
         args.func(args)
@@ -149,4 +150,4 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    main(sys.argv)

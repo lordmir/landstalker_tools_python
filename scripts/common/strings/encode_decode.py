@@ -1,4 +1,4 @@
-from tools.strings.charset import Charset, INTRO_CHARSET, REVERSE_INTRO_CHARSET, CREDITS_CHARSET, REVERSE_CREDITS_CHARSET
+from scripts.common.strings.charset import Charset, INTRO_CHARSET, REVERSE_INTRO_CHARSET, CREDITS_CHARSET, REVERSE_CREDITS_CHARSET
 
 
 def decode_string(encoded_string: bytes, charset: Charset) -> str:

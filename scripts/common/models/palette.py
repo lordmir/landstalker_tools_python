@@ -1,4 +1,4 @@
-from colorama import Fore, Back, Style, init
+from colorama import Fore, Style
 
 class Palettes:
     def __init__(self, **kwargs):

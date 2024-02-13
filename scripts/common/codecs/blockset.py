@@ -1,6 +1,6 @@
 from bitstring import BitStream, Bits
 
-from tools.models.tile import Tile, Attr
+from scripts.common.models.tile import Tile, Attr
 
 
 def decompress(data: bytes) -> list[list[Tile]]:
