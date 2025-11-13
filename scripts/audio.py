@@ -83,7 +83,7 @@ def process_ym_channel(offset, bank):
         elif commandbyte == 0xFD:
             volume = bank[offset] & 0x0F
             offset += 1
-            commands.append({"bytes": bank[offset-2:offset], "command": "SET_VOLUME", "operands": {"volume": volume}, "description": f"Set volume to {volume:02X} and reload instrument"})
+            commands.append({"bytes": bank[offset-2:offset], "command": "SET_VOLUME_LEVEL", "operands": {"level": volume}, "description": f"Set volume to {volume:02X} and reload instrument"})
         elif commandbyte == 0xFC:
             op = bank[offset]
             offset += 1
