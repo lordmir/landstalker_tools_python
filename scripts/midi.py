@@ -59,7 +59,7 @@ def get_midi_cmds(data):
     channels = []
 
     channel_idx = 0
-    if "channels" not in data:
+    if "channels" not in data or not data['channels']:
         return []
     for channel in data['channels']:
         channel_idx += 1
