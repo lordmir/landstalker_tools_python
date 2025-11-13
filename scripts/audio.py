@@ -471,11 +471,11 @@ for i, sample in enumerate(pcm_sample_data):
     play_pcm_sample(sample, pcm_sample_table[i]['sample_rate'])
 
 sfx_data = get_all_sfx(SFX_TABLE_OFFSET, NUM_SFX, drv)
-dump_all_bank_audio(sfx_data, "sfx", 0, dump_sfx)
+dump_all_bank_audio(sfx_data, "sfx", 65, dump_sfx)
 bank3_data = get_all_music(BANK3_TABLE_OFFSET, NUM_BANK3_TRACKS, bank3)
-dump_all_bank_audio(bank3_data, "music", 0, dump_music)
+dump_all_bank_audio(bank3_data, "music", 33, dump_music)
 bank4_data = get_all_music(BANK4_TABLE_OFFSET, NUM_BANK4_TRACKS, bank4)
-dump_all_bank_audio(bank4_data, "music", 32, dump_music)
+dump_all_bank_audio(bank4_data, "music", 1, dump_music)
 
 
 for i in range(64):

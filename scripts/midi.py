@@ -46,20 +46,21 @@ def merge_channels(channels):
         next_events.sort()
         next_delta, chan_idx, cmd = next_events[0]
         for i in range(len(channels)):
-            if pointers[i] < len(channels):
+            if pointers[i] < len(channels[i]):
                 _, delta = channels[i][pointers[i]]
                 deltas[i] += next_delta - deltas[i]
         merged.append((cmd, next_delta))
         pointers[chan_idx] += 1
     return merged
 
-def get_midi_cmds(filename):
-    data = yaml.safe_load(open(filename))
+def get_midi_cmds(data):
     note_duration = 1
     velocity = 112
     channels = []
 
     channel_idx = 0
+    if "channels" not in data:
+        return []
     for channel in data['channels']:
         channel_idx += 1
         notes = []
@@ -113,7 +114,13 @@ for filename in glob.glob("sample_*.wav"):
         print(f"Sample rate: {wf.getframerate()}, Channels: {wf.getnchannels()}, Sample width: {wf.getsampwidth()}")
         samples.append({"data": wf.readframes(wf.getnframes()), "sample_rate": wf.getframerate(), "channels": wf.getnchannels(), "sample_width": wf.getsampwidth()})
 
-for filename in glob.glob("music_*.yaml"):
+for filename in glob.glob("*.yaml"):
     print(f"Playing {filename}...")
-    play_midi(get_midi_cmds(filename))
+    with open(filename) as f:
+        data = yaml.safe_load(f)
+    if "ym_timer_b" in data:
+        tick_rate = data['ym_timer_b'] / 10000.0
+    else:
+        tick_rate = 0.02
+    play_midi(get_midi_cmds(data), tick=tick_rate)
     time.sleep(1)
