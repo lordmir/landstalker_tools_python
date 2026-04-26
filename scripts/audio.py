@@ -234,6 +234,154 @@ def extract_samples(disasm_dir: Path, output_file: Path) -> None:
         
     print(f"Successfully exported sample data to {output_file}")
 
+def parse_sequence_asm(asm_text: str) -> dict:
+    """Parses music and SFX sequence tracks into a structured dictionary."""
+    header = []
+    pointers = []
+    blocks = {}
+    current_label = None
+    
+    for line in asm_text.splitlines():
+        line = line.split(';')[0].strip()
+        if not line:
+            continue
+            
+        label_match = re.match(r'^([a-zA-Z0-9_]+):', line)
+        if label_match:
+            current_label = label_match.group(1)
+            blocks[current_label] = []
+            line = line[label_match.end():].strip()
+            if not line:
+                continue
+                
+        if line.lower().startswith('db '):
+            values = line[3:].split(',')
+            for v in values:
+                v = v.strip()
+                if not v: continue
+                try:
+                    if v.endswith('h') or v.endswith('H'):
+                        val = int(v[:-1], 16)
+                    elif v.startswith('0x') or v.startswith('0X'):
+                        val = int(v, 16)
+                    else:
+                        val = int(v)
+                        
+                    if current_label is None:
+                        header.append(val)
+                    else:
+                        blocks[current_label].append(val)
+                except ValueError:
+                    pass
+        elif line.lower().startswith('dw '):
+            values = line[3:].split(',')
+            for v in values:
+                v = v.strip()
+                if not v: continue
+                if current_label is None:
+                    pointers.append(v)
+                else:
+                    blocks[current_label].append(v)
+                    
+    result = {}
+    if header:
+        result["header"] = FlowList([HexInt(x) if isinstance(x, int) and x > 9 else x for x in header])
+    if pointers:
+        result["pointers"] = pointers
+    if blocks:
+        result["blocks"] = {
+            k: FlowList([HexInt(x) if isinstance(x, int) and x > 9 else x for x in v]) 
+            for k, v in blocks.items() if v
+        }
+    return result
+
+def extract_sequences(disasm_dir: Path, output_dir: Path) -> None:
+    """Extracts all music and SFX sequence tracks to YAML."""
+    output_dir.mkdir(parents=True, exist_ok=True)
+    music_dir = disasm_dir / "code" / "audio" / "music"
+    sfx_dir = disasm_dir / "code" / "audio" / "sfx"
+    
+    if music_dir.exists():
+        for asm_file in music_dir.glob("*.asm"):
+            if asm_file.name == "music_null.asm": 
+                continue
+            parsed = parse_sequence_asm(asm_file.read_text(encoding="utf-8"))
+            if not parsed: 
+                continue
+            out_file = output_dir / f"{asm_file.stem}.yaml"
+            with open(out_file, "w", encoding="utf-8") as f:
+                yaml.dump(parsed, f, default_flow_style=False, sort_keys=False)
+                
+    if sfx_dir.exists():
+        for asm_file in sfx_dir.glob("*_header.asm"):
+            header_text = asm_file.read_text(encoding="utf-8")
+            data_file = asm_file.parent / asm_file.name.replace("_header", "_data")
+            if data_file.exists():
+                header_text += "\n" + data_file.read_text(encoding="utf-8")
+            parsed = parse_sequence_asm(header_text)
+            if not parsed: 
+                continue
+            sfx_name = asm_file.stem.replace("_header", "")
+            out_file = output_dir / f"{sfx_name}.yaml"
+            with open(out_file, "w", encoding="utf-8") as f:
+                yaml.dump(parsed, f, default_flow_style=False, sort_keys=False)
+                
+    print(f"Successfully extracted sequence data to {output_dir}")
+
+def format_asm_byte(v: int) -> str:
+    if v < 10:
+        return str(v)
+    s = f"{v:02X}"
+    return f"0{s}h" if s[0] in "ABCDEF" else f"{s}h"
+
+def compile_sequences(yaml_dir: Path, disasm_dir: Path) -> None:
+    """Compiles YAML sequence tracks back to assembly."""
+    music_dir = disasm_dir / "code" / "audio" / "music"
+    sfx_dir = disasm_dir / "code" / "audio" / "sfx"
+    
+    for yaml_file in yaml_dir.glob("*.yaml"):
+        if yaml_file.name in ("instruments.yaml", "samples.yaml"):
+            continue
+            
+        with open(yaml_file, "r", encoding="utf-8") as f:
+            data = yaml.safe_load(f)
+            
+        is_sfx = yaml_file.stem.startswith("sfx")
+        
+        header_lines = []
+        if "header" in data:
+            header_lines.append(f"\t\tdb {', '.join(str(v) for v in data['header'])}\n")
+        if "pointers" in data:
+            for p in data["pointers"]:
+                header_lines.append(f"\t\tdw {p}\n")
+                
+        data_lines = []
+        if "blocks" in data:
+            for label, block in data["blocks"].items():
+                data_lines.append(f"{label}:\n")
+                for i in range(0, len(block), 16):
+                    chunk = block[i:i+16]
+                    f_chunk = [format_asm_byte(v) if isinstance(v, int) else str(v) for v in chunk]
+                    data_lines.append(f"\t\tdb {', '.join(f_chunk)}\n")
+                    
+        if is_sfx:
+            header_file = sfx_dir / f"{yaml_file.stem}_header.asm"
+            data_file = sfx_dir / f"{yaml_file.stem}_data.asm"
+            with open(header_file, "w", encoding="utf-8") as f:
+                f.writelines(header_lines)
+            if data_lines:
+                with open(data_file, "w", encoding="utf-8") as f:
+                    f.writelines(data_lines)
+        else:
+            asm_file = music_dir / f"{yaml_file.stem}.asm"
+            with open(asm_file, "w", encoding="utf-8") as f:
+                f.writelines(header_lines)
+                if header_lines and data_lines:
+                    f.write("\n")
+                f.writelines(data_lines)
+                
+    print(f"Successfully compiled sequence data to ASM")
+
 def main(args: list[str]) -> None:
     """
     Entry point for the audio script.
@@ -245,10 +393,18 @@ def main(args: list[str]) -> None:
     parser.add_argument("--disasm", type=Path, default=Path("landstalker_disasm"), help="Path to landstalker_disasm directory")
     parser.add_argument("--out", type=Path, default=Path("instruments.yaml"), help="Path to output YAML file")
     parser.add_argument("--out-samples", type=Path, default=Path("samples.yaml"), help="Path to output samples YAML file")
+    parser.add_argument("--extract-seq", type=Path, help="Directory to extract music/sfx YAML sequences to")
+    parser.add_argument("--compile-seq", type=Path, help="Directory containing YAML sequences to compile back to ASM")
     
     parsed_args = parser.parse_args(args)
     extract_instruments(parsed_args.disasm, parsed_args.out)
     extract_samples(parsed_args.disasm, parsed_args.out_samples)
+    
+    if parsed_args.extract_seq:
+        extract_sequences(parsed_args.disasm, parsed_args.extract_seq)
+        
+    if parsed_args.compile_seq:
+        compile_sequences(parsed_args.compile_seq, parsed_args.disasm)
 
 if __name__ == "__main__":
     main(sys.argv[1:])
