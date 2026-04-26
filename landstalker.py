@@ -1,6 +1,6 @@
 import sys
 
-from scripts import palette, sprite_frame, tilemap_2d, tilemap_iso, lz77, blockset, strings
+from scripts import palette, sprite_frame, tilemap_2d, tilemap_iso, lz77, blockset, strings, ym_instruments, audio_data, music, sfx
 
 commands = {
     "palette": palette.main,
@@ -9,7 +9,11 @@ commands = {
     "tilemap_iso": tilemap_iso.main,
     "lz77": lz77.main,
     "blockset": blockset.main,
-    "strings": strings.main
+    "strings": strings.main,
+    "ym_instruments": ym_instruments.main,
+    "audio_data": audio_data.main,
+    "music": music.main,
+    "sfx": sfx.main
 }
 
 if __name__ == "__main__":
