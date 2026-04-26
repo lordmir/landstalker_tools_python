@@ -25,6 +25,7 @@ Each channel pointer points to a sequence of bytes. The driver parses these fram
 ### Notes and Rests (`0x00` - `0xEF`)
 
 *   **Pitch (`0x00` - `0x6F`):** Values in this range represent note pitches. They act as indexes into a hardware-specific frequency lookup table (`t_YM_FREQUENCIES` or `t_PSG_FREQUENCIES`).
+    *   **Unified Pitch Mapping:** The assembler values map directly to a chromatic scale starting at **C0** (`0x00`). Every 12 values represents a full octave. The byte value can be calculated as `(Octave * 12) + Semitone_Offset` (where C=0, C#=1, D=2, etc.). For example: `0x00` is C0, `0x0C` is C1, and `0x18` is C2. To compensate for the fact that the PSG hardware frequency table begins at A1, the audio driver dynamically subtracts `0x15` (21 semitones) from the note value before looking up the frequency for a PSG channel. This allows composers to use the exact same note values for both YM and PSG channels.
     *   **DAC Exception (YM6 Channel):** For the 6th YM channel, the driver reinterprets pitch values as **PCM Sample IDs**. A byte value of `0x00` plays Sample 1 (the 1st entry in `t_SAMPLE_LOAD_DATA`). `0x05` plays Sample 6.
 *   **Rest (`0x70`):** Mutes the channel (triggers a Key Off). This also works for the DAC channel to silence a playing sample.
 *   **Duration Flag (`0x80`):** The highest bit acts as a duration toggle to compress the sequence data. This applies to all channels, including the DAC.
